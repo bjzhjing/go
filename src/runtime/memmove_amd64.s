@@ -392,9 +392,6 @@ gobble_128_loop:
 	RET
 
 gobble_big_data_fwd:
-	// There is forward copying for big regions.
-	// It uses non-temporal mov instructions.
-	// Details of this algorithm are commented previously for small sizes.
 	LEAQ	(SI)(BX*1), CX
 	MOVOU	-0x80(SI)(BX*1), X5
 	MOVOU	-0x70(CX), X6
@@ -404,10 +401,11 @@ gobble_big_data_fwd:
 	MOVOU	-0x30(CX), X10
 	MOVOU	-0x20(CX), X11
 	MOVOU	-0x10(CX), X12
-	VMOVDQU	(SI), Y4
+	//VMOVDQU	(SI), Y4
+	VMOVDQU64	(SI), Z4
 	MOVQ	DI, R8
-	ANDQ	$-32, DI
-	ADDQ	$32, DI
+	ANDQ	$-64, DI
+	ADDQ	$64, DI
 	MOVQ	DI, R10
 	SUBQ	R8, R10
 	SUBQ	R10, BX
@@ -415,12 +413,22 @@ gobble_big_data_fwd:
 	LEAQ	(DI)(BX*1), CX
 	SUBQ	$0x80, BX
 gobble_mem_fwd_loop:
-	PREFETCHNTA 0x1C0(SI)
-	PREFETCHNTA 0x280(SI)
-	// Prefetch values were chosen empirically.
-	// Approach for prefetch usage as in 9.5.6 of [1]
-	// [1] 64-ia-32-architectures-optimization-manual.pdf
-	// https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-optimization-manual.pdf
+        VMOVDQU64	(SI), Z0
+        VMOVDQU64	0x40(SI), Z1
+        VMOVDQU64	0x80(SI), Z2
+        VMOVDQU64	0xC0(SI), Z3
+        VMOVNTDQ	Z0, (DI)
+        VMOVNTDQ	Z1, 0x40(DI)
+        VMOVNTDQ	Z2, 0x80(DI)
+        VMOVNTDQ	Z3, 0xC0(DI)
+        ADDQ    $0x100, SI
+        ADDQ    $0x100, DI
+        SUBQ    $0x100, BX
+	CMPQ	BX, $0x100
+        JAE	gobble_mem_fwd_loop
+	CMPQ	BX, $0x0
+	JBE	end_mem_fwd
+copy_128_loop:
 	VMOVDQU	(SI), Y0
 	VMOVDQU	0x20(SI), Y1
 	VMOVDQU	0x40(SI), Y2
@@ -432,11 +440,13 @@ gobble_mem_fwd_loop:
 	VMOVNTDQ Y3, 0x60(DI)
 	ADDQ	$0x80, DI
 	SUBQ	$0x80, BX
-	JA		gobble_mem_fwd_loop
+	JA	copy_128_loop
 	// NT instructions don't follow the normal cache-coherency rules.
 	// We need SFENCE there to make copied data available timely.
+end_mem_fwd:
 	SFENCE
-	VMOVDQU	Y4, (R8)
+	//VMOVDQU	Y4, (R8)
+	VMOVDQU64	Z4, (R8)
 	VZEROUPPER
 	MOVOU	X5, -0x80(CX)
 	MOVOU	X6, -0x70(CX)
