@@ -415,8 +415,14 @@ gobble_big_data_fwd:
 	LEAQ	(DI)(BX*1), CX
 	SUBQ	$0x80, BX
 gobble_mem_fwd_loop:
-	PREFETCHNTA 0x1C0(SI)
-	PREFETCHNTA 0x280(SI)
+	PREFETCHT1 0x100(SI)
+	PREFETCHT1 0x120(SI)
+	PREFETCHT1 0x140(SI)
+	PREFETCHT1 0x160(SI)
+	PREFETCHT1 0x180(SI)
+	PREFETCHT1 0x1A0(SI)
+	PREFETCHT1 0x1C0(SI)
+	PREFETCHT1 0x1E0(SI)
 	// Prefetch values were chosen empirically.
 	// Approach for prefetch usage as in 9.5.6 of [1]
 	// [1] 64-ia-32-architectures-optimization-manual.pdf
